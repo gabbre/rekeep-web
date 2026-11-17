@@ -88,6 +88,24 @@ class FirebaseBackend {
     }
   }
 
+  async getBlob(id, i) {
+    const s = await this.F.getDoc(this.F.doc(this.db, 'users', this.user.uid, 'blobs', `${id}_${i}`));
+    if (!s.exists()) throw new Error('Immagine non ancora disponibile');
+    return s.data().d;
+  }
+
+  async writeBlobs(id, chunks) {
+    const batch = this.F.writeBatch(this.db);
+    chunks.forEach((d, i) => batch.set(this.F.doc(this.db, 'users', this.user.uid, 'blobs', `${id}_${i}`), { img: id, i, n: chunks.length, d }));
+    await batch.commit();
+  }
+
+  async deleteBlobs(list) {
+    const batch = this.F.writeBatch(this.db);
+    for (const { id, parts } of list) for (let i = 0; i < parts; i++) batch.delete(this.F.doc(this.db, 'users', this.user.uid, 'blobs', `${id}_${i}`));
+    await batch.commit();
+  }
+
   stop() { this.unsubs.forEach((u) => u()); this.unsubs = []; }
 }
 
@@ -136,6 +154,22 @@ class DemoBackend {
     for (const { id, data } of ops) this.docs.set(id, data);
     if (settings) this.settings = settings;
     this.notesCb?.(ops.map(({ id, data }) => ({ id, ...data })), false);
+  }
+
+  async getBlob(id, i) {
+    await new Promise((r) => setTimeout(r, 80));
+    const d = this.blobs?.get(`${id}_${i}`);
+    if (d == null) throw new Error('Immagine non disponibile');
+    return d;
+  }
+
+  async writeBlobs(id, chunks) {
+    this.blobs ??= new Map();
+    chunks.forEach((d, i) => this.blobs.set(`${id}_${i}`, d));
+  }
+
+  async deleteBlobs(list) {
+    for (const { id, parts } of list) for (let i = 0; i < parts; i++) this.blobs?.delete(`${id}_${i}`);
   }
 
   stop() { this.notesCb = null; this.settingsCb = null; }

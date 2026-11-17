@@ -16,6 +16,7 @@ export function newNote({ checklist = false, label = null } = {}) {
     trashedAt: null,
     labels: label ? [label] : [],
     reminder: null,
+    images: [],
     createdAt: now,
     updatedAt: now,
     changedAt: now,
@@ -37,6 +38,7 @@ export function fromJson(o) {
     trashedAt: o.trashedAt == null ? null : Number(o.trashedAt),
     labels: [...(o.labels ?? [])],
     reminder: o.reminder ?? null,
+    images: (o.images ?? []).map((i) => ({ id: String(i.id), w: Number(i.w ?? 0), h: Number(i.h ?? 0), p: Number(i.p ?? 1) })),
     createdAt: Number(o.createdAt ?? updatedAt),
     updatedAt,
     changedAt: Number(o.changedAt ?? updatedAt),
@@ -60,12 +62,13 @@ export function toJson(n) {
   };
   if (n.trashedAt != null) o.trashedAt = n.trashedAt;
   if (n.reminder) o.reminder = n.reminder;
+  if (n.images?.length) o.images = n.images.map((i) => ({ id: i.id, w: i.w, h: i.h, p: i.p }));
   return o;
 }
 
 export const inTrash = (n) => n.trashedAt != null;
 export const isBlank = (n) =>
-  !n.title.trim() && !n.text.trim() && n.items.every((i) => !i.t.trim()) && !n.reminder;
+  !n.title.trim() && !n.text.trim() && n.items.every((i) => !i.t.trim()) && !n.reminder && !n.images?.length;
 export const activeReminder = (n) => (n.reminder && !n.reminder.done && !inTrash(n) ? n.reminder : null);
 export const isRepeating = (r) => (r.type === 'time' ? r.repeat && r.repeat !== 'NONE' : !!r.repeat);
 

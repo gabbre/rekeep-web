@@ -47,6 +47,20 @@ export async function encryptString(key, text) {
   return b64(out);
 }
 
+export async function encryptBytes(key, bytes) {
+  const iv = randomBytes(12);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
+  const out = new Uint8Array(12 + ct.length);
+  out.set(iv, 0);
+  out.set(ct, 12);
+  return b64(out);
+}
+
+export async function decryptBytes(key, data) {
+  const all = unb64(data);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.subarray(0, 12) }, key, all.subarray(12)));
+}
+
 export async function decryptString(key, data) {
   const all = unb64(data);
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.subarray(0, 12) }, key, all.subarray(12));

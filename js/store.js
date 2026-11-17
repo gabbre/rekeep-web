@@ -2,8 +2,11 @@
 // Stesso schema dell'app: users/{uid}, users/{uid}/notes/{id} {c,d,e}, users/{uid}/meta/settings {c,e}.
 // Per ogni nota vince la versione con changedAt più alto.
 
-import { encryptString, decryptString, deriveKey, randomBytes, b64, unb64, ITERATIONS, CHECK_TEXT } from './crypto.js';
-import { fromJson, toJson, isBlank, inTrash } from './model.js';
+import { encryptString, decryptString, encryptBytes, decryptBytes, deriveKey, randomBytes, b64, unb64, ITERATIONS, CHECK_TEXT } from './crypto.js';
+import { fromJson, toJson, isBlank, inTrash, uid } from './model.js';
+
+/** Caratteri Base64 per pezzo (come l'app): sotto il limite di 1 MiB per documento. */
+export const CHUNK = 700000;
 
 export class Store {
   constructor(backend) {
@@ -19,6 +22,8 @@ export class Store {
     this.status = { syncing: false, error: null, lastSync: 0, pending: 0 };
     this.pushTimer = null;
     this.undecryptable = 0;
+    this.imageUrls = new Map();
+    this.imageLoads = new Map();
   }
 
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -139,6 +144,7 @@ export class Store {
 
   remove(ids) {
     const now = Date.now();
+    this.deleteImages(ids.flatMap((id) => this.notes.get(id)?.images ?? []));
     for (const id of ids) { this.notes.delete(id); this.deleted.set(id, now); }
     this.emit();
     this.schedulePush();
@@ -151,6 +157,48 @@ export class Store {
     this.settings = s;
     this.emit();
     this.schedulePush();
+  }
+
+  // ---------- Immagini (cifrate, a pezzi) ----------
+
+  /** URL locale dell'immagine decifrata (scaricata una volta sola). */
+  imageUrl(img) {
+    if (this.imageUrls.has(img.id)) return Promise.resolve(this.imageUrls.get(img.id));
+    if (this.imageLoads.has(img.id)) return this.imageLoads.get(img.id);
+    const p = (async () => {
+      const parts = [];
+      for (let i = 0; i < (img.p || 1); i++) parts.push(await this.backend.getBlob(img.id, i));
+      const bytes = await decryptBytes(this.key, parts.join(''));
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
+      this.imageUrls.set(img.id, url);
+      return url;
+    })();
+    this.imageLoads.set(img.id, p);
+    p.catch(() => setTimeout(() => this.imageLoads.delete(img.id), 15000));
+    return p;
+  }
+
+  /** Cifra e carica un JPEG; restituisce il riferimento da mettere nella nota. */
+  async uploadImage(bytes, w, h) {
+    const id = uid();
+    const enc = await encryptBytes(this.key, bytes);
+    const chunks = [];
+    for (let i = 0; i < enc.length; i += CHUNK) chunks.push(enc.slice(i, i + CHUNK));
+    await this.backend.writeBlobs(id, chunks);
+    this.imageUrls.set(id, URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' })));
+    return { id, w, h, p: chunks.length };
+  }
+
+  /** Copia un'immagine (per "Crea una copia"). */
+  async duplicateImage(img) {
+    const url = await this.imageUrl(img);
+    const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    return this.uploadImage(bytes, img.w, img.h);
+  }
+
+  deleteImages(images) {
+    if (!images?.length) return;
+    this.backend.deleteBlobs(images.map((i) => ({ id: i.id, parts: i.p || 1 }))).catch((e) => console.warn('Immagini non eliminate', e));
   }
 
   // ---------- Invio ----------

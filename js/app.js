@@ -292,6 +292,9 @@ function estimateHeight(n) {
   if (n.checklist) h += 24 * Math.min(9, n.items.filter((i) => !i.c && i.t.trim()).length) + (n.items.some((i) => i.c) ? 22 : 0);
   else if (n.text) h += 21 * Math.min(12, n.text.split('\n').reduce((s, l) => s + Math.max(1, Math.ceil(l.length / 30)), 0));
   if (n.reminder || n.labels.length) h += 34;
+  const imgs = n.images ?? [];
+  if (imgs.length === 1) h += 240 / Math.min(2.2, Math.max(0.6, (imgs[0].w || 4) / (imgs[0].h || 3)));
+  else if (imgs.length) h += 85;
   return h;
 }
 
@@ -326,6 +329,120 @@ function applyCardColor(el, n) {
   el.classList.toggle('colored', !!c);
 }
 
+// ---------- Immagini ----------
+
+/** Griglia di immagini (una a tutta larghezza, altrimenti 2-3 per riga). */
+function imageGrid(images, { max = 30, onClick = null, onRemove = null } = {}) {
+  const shown = images.slice(0, max);
+  const g = document.createElement('div');
+  const n = shown.length;
+  g.className = 'imgs ' + (n === 1 ? 'n1' : n === 2 ? 'n2' : n === 3 ? 'n3' : n === 4 ? 'n4' : 'nmany');
+  shown.forEach((img, i) => {
+    const box = document.createElement('div');
+    box.className = 'im';
+    if (n === 1 && img.w && img.h) box.style.setProperty('--ar', Math.min(2.2, Math.max(0.6, img.w / img.h)));
+    const wait = document.createElement('div');
+    wait.className = 'wait';
+    wait.innerHTML = '<span class="ms">image</span>';
+    const el = document.createElement('img');
+    el.alt = '';
+    el.loading = 'lazy';
+    box.append(wait, el);
+    store.imageUrl(img).then((url) => { el.src = url; el.onload = () => { el.classList.add('ok'); wait.remove(); }; })
+      .catch(() => { wait.innerHTML = '<span class="ms" title="Immagine non ancora disponibile">cloud_download</span>'; });
+    if (onClick) box.onclick = (e) => { e.stopPropagation(); onClick(i); };
+    if (onRemove) {
+      const x = document.createElement('button');
+      x.className = 'x'; x.title = 'Elimina immagine';
+      x.innerHTML = '<span class="ms">close</span>';
+      x.onclick = (e) => { e.stopPropagation(); onRemove(img); };
+      box.append(x);
+    }
+    if (i === n - 1 && images.length > n) box.insertAdjacentHTML('beforeend', `<span class="more-n">+${images.length - n}</span>`);
+    g.append(box);
+  });
+  return g;
+}
+
+/** Riduce la foto a 1600 px sul lato lungo (con la rotazione corretta) e la converte in JPEG. */
+async function prepareImage(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * scale));
+  const h = Math.max(1, Math.round(bmp.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.82));
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), w, h };
+}
+
+let uploading = 0;
+async function addImages(files) {
+  const id = ed.id;
+  uploading += files.length;
+  refreshEditorChrome();
+  let failed = 0;
+  for (const f of files) {
+    try {
+      const { bytes, w, h } = await prepareImage(f);
+      const img = await store.uploadImage(bytes, w, h);
+      if (ed.id === id) edit((x) => ({ ...x, images: [...(x.images ?? []), img] }));
+      else store.update(id, (x) => ({ ...x, images: [...(x.images ?? []), img] }));
+    } catch (e) {
+      console.warn(e);
+      failed++;
+    } finally {
+      uploading--;
+      if (ed.id === id) refreshEditorChrome();
+    }
+  }
+  if (failed) toast(`Impossibile aggiungere ${failed === 1 ? "un'immagine" : `${failed} immagini`}`);
+}
+
+$('ed-image').onclick = () => $('ed-file').click();
+$('ed-file').onchange = (e) => {
+  const files = [...e.target.files].filter((f) => f.type.startsWith('image/'));
+  e.target.value = '';
+  if (files.length) addImages(files);
+};
+
+const lb = { images: [], index: 0, onDelete: null };
+function openLightbox(images, index, onDelete) {
+  Object.assign(lb, { images, index, onDelete });
+  if (!$('lightbox').open) $('lightbox').showModal();
+  showLightbox();
+}
+function showLightbox() {
+  const img = lb.images[lb.index];
+  if (!img) { $('lightbox').close(); return; }
+  $('lb-img').removeAttribute('src');
+  store.imageUrl(img).then((url) => { if (lb.images[lb.index] === img) $('lb-img').src = url; }).catch(() => {});
+  $('lb-count').textContent = lb.images.length > 1 ? `${lb.index + 1} / ${lb.images.length}` : '';
+  $('lb-prev').hidden = $('lb-next').hidden = lb.images.length < 2;
+  $('lb-delete').hidden = !lb.onDelete;
+}
+$('lb-close').onclick = () => $('lightbox').close();
+$('lb-prev').onclick = () => { lb.index = (lb.index - 1 + lb.images.length) % lb.images.length; showLightbox(); };
+$('lb-next').onclick = () => { lb.index = (lb.index + 1) % lb.images.length; showLightbox(); };
+$('lb-delete').onclick = () => {
+  const img = lb.images[lb.index];
+  lb.onDelete?.(img);
+  lb.images = lb.images.filter((x) => x !== img);
+  lb.index = Math.min(lb.index, lb.images.length - 1);
+  showLightbox();
+};
+$('lightbox').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') $('lb-prev').click();
+  else if (e.key === 'ArrowRight') $('lb-next').click();
+});
+
+function removeImage(img) {
+  edit((x) => ({ ...x, images: (x.images ?? []).filter((i) => i.id !== img.id) }));
+  store.deleteImages([img]);
+}
+
 function card(n) {
   const el = document.createElement('article');
   el.className = 'card';
@@ -333,6 +450,14 @@ function card(n) {
   el.tabIndex = 0;
   el.onclick = () => openEditor(n.id);
   el.onkeydown = (e) => { if (e.key === 'Enter') openEditor(n.id); };
+
+  const imgs = n.images ?? [];
+  const hasText = n.title.trim() || n.text.trim() || n.items.some((i) => i.t.trim());
+  if (imgs.length) {
+    el.classList.add('has-imgs');
+    if (!hasText && !n.reminder && !n.labels.length) el.classList.add('only-imgs');
+    el.append(imageGrid(imgs, { max: 3 }));
+  }
 
   if (n.title.trim()) {
     const h = document.createElement('h3');
@@ -357,7 +482,7 @@ function card(n) {
     p.textContent = n.text;
     el.append(p);
   }
-  if (!n.title.trim() && !n.text.trim() && n.items.every((i) => !i.t.trim())) {
+  if (!hasText && !imgs.length) {
     el.classList.add('empty-note');
     el.insertAdjacentHTML('beforeend', '<div class="text">Nota vuota</div>');
   }
@@ -520,7 +645,24 @@ function refreshEditorChrome() {
   $('ed-archive').title = n.archived ? "Estrai dall'archivio" : 'Archivia';
   $('ed-toggle-list').innerHTML = `<span class="ms">${n.checklist ? 'notes' : 'check_box'}</span>`;
   $('ed-toggle-list').title = n.checklist ? 'Trasforma in testo' : 'Trasforma in elenco';
-  $('ed-edited').textContent = ed.draft ? '' : M.formatEdited(n.updatedAt);
+  $('ed-edited').textContent = uploading ? 'Caricamento immagini…' : ed.draft ? '' : M.formatEdited(n.updatedAt);
+
+  const imgBox = $('ed-images');
+  const imgs = n.images ?? [];
+  const key = imgs.map((i) => i.id).join(',') + (trashMode ? 't' : '');
+  if (imgBox.dataset.key !== key) {
+    imgBox.dataset.key = key;
+    imgBox.innerHTML = '';
+    if (imgs.length) {
+      const g = imageGrid(imgs, {
+        onClick: (i) => openLightbox(imgs, i, trashMode ? null : removeImage),
+        onRemove: trashMode ? null : removeImage,
+      });
+      imgBox.className = g.className + ' editor-imgs';
+      imgBox.append(...g.childNodes);
+    }
+  }
+  imgBox.hidden = !imgs.length;
 
   const chips = $('ed-chips');
   chips.innerHTML = '';
@@ -695,12 +837,17 @@ $('ed-delete').onclick = () => {
   trash(id);
 };
 
-$('ed-copy').onclick = () => {
+$('ed-copy').onclick = async () => {
   const n = cur();
   if (ed.draft) return;
   const now = Date.now();
-  const copy = { ...structuredClone(n), id: M.uid(), items: n.items.map((i) => ({ ...i, id: M.uid() })), reminder: null, pinned: false, createdAt: now };
   $('dlg-editor').close();
+  let images = [];
+  if (n.images?.length) {
+    toast('Copia delle immagini…');
+    images = (await Promise.all(n.images.map((i) => store.duplicateImage(i).catch(() => null)))).filter(Boolean);
+  }
+  const copy = { ...structuredClone(n), id: M.uid(), items: n.items.map((i) => ({ ...i, id: M.uid() })), images, reminder: null, pinned: false, createdAt: now };
   store.put(copy);
   openEditor(copy.id);
 };
@@ -715,6 +862,7 @@ $('ed-destroy').onclick = async () => {
 };
 
 $('dlg-editor').addEventListener('close', () => {
+  $('ed-images').dataset.key = '';
   const n = store.get(ed.id);
   if (n && M.isBlank(n) && !M.inTrash(n)) store.remove([n.id]);
   ed.id = null;

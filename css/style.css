@@ -349,6 +349,41 @@ input[type=range] { width: 100%; accent-color: var(--primary); }
 }
 .toast .btn.text { color: #F7BD48; }
 
+/* ---------- Immagini ---------- */
+.imgs { display: grid; gap: 2px; overflow: hidden; }
+.imgs.n1 { grid-template-columns: 1fr; }
+.imgs.n2, .imgs.n4 { grid-template-columns: 1fr 1fr; }
+.imgs.n3, .imgs.nmany { grid-template-columns: 1fr 1fr 1fr; }
+.imgs .im { position: relative; background: color-mix(in srgb, var(--on) 8%, transparent); aspect-ratio: 1; overflow: hidden; }
+.imgs.n1 .im { aspect-ratio: var(--ar, 1.33); max-height: 420px; }
+.imgs .im img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .2s; }
+.imgs .im img.ok { opacity: 1; }
+.imgs .im .wait { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+.imgs .im .x {
+  position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; opacity: 0; transition: opacity .15s;
+}
+.imgs .im:hover .x { opacity: 1; }
+.imgs .im .x .ms { font-size: 18px; }
+.imgs .more-n { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.55); color: #fff; border-radius: 8px; padding: 1px 8px; font-size: 13px; }
+.card.has-imgs { padding-top: 0; overflow: hidden; }
+.card.has-imgs > .imgs { margin: 0 -16px 10px; }
+.card.only-imgs { padding-bottom: 0; }
+.card.only-imgs > .imgs { margin-bottom: 0; }
+.editor-imgs { margin: -14px -16px 8px; cursor: zoom-in; }
+.editor-imgs .im { cursor: zoom-in; }
+.uploading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; padding: 4px 0; }
+.uploading .spinner { width: 16px; height: 16px; border-width: 2px; }
+
+.lightbox { width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; margin: 0; border-radius: 0; background: #000; place-items: center; }
+.lightbox[open] { display: grid; animation: none; }
+.lightbox::backdrop { background: rgba(0,0,0,.6); }
+.lightbox img { max-width: 94vw; max-height: 88vh; object-fit: contain; }
+.lb-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 8px; color: #fff; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); color: #fff; width: 52px; height: 52px; background: rgba(255,255,255,.08); }
+.lb-nav .ms { font-size: 32px; }
+.lb-prev { left: 12px; } .lb-next { right: 12px; }
+
 /* ---------- Telefono ---------- */
 @media (max-width: 760px) {
   .brand span, .brand { width: auto; }

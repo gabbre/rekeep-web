@@ -95,6 +95,7 @@
   <!-- Editor nota -->
   <dialog id="dlg-editor" class="editor">
     <div class="editor-scroll">
+      <div class="imgs editor-imgs" id="ed-images" hidden></div>
       <div class="editor-head">
         <input class="editor-title" id="ed-title" placeholder="Titolo" autocomplete="off">
         <button class="icon-btn" id="ed-pin" title="Fissa"><span class="ms">keep</span></button>
@@ -106,6 +107,8 @@
     <div class="editor-foot">
       <div class="tools" id="ed-tools">
         <button class="icon-btn" id="ed-reminder" title="Promemoria"><span class="ms">add_alert</span></button>
+        <button class="icon-btn" id="ed-image" title="Aggiungi immagini"><span class="ms">add_photo_alternate</span></button>
+        <input type="file" id="ed-file" accept="image/*" multiple hidden>
         <button class="icon-btn" id="ed-color" title="Colore"><span class="ms">palette</span></button>
         <button class="icon-btn" id="ed-labels" title="Etichette"><span class="ms">label</span></button>
         <button class="icon-btn" id="ed-toggle-list" title="Trasforma in elenco"><span class="ms">check_box</span></button>
@@ -213,6 +216,18 @@
     <h2 id="cf-title"></h2>
     <p id="cf-text" class="muted"></p>
     <div class="sheet-foot"><span class="spacer"></span><button class="btn text" data-close>Annulla</button><button class="btn filled" id="cf-ok">Elimina</button></div>
+  </dialog>
+
+  <dialog class="lightbox" id="lightbox">
+    <img id="lb-img" alt="">
+    <div class="lb-bar">
+      <button class="icon-btn" id="lb-close" title="Chiudi"><span class="ms">close</span></button>
+      <span id="lb-count"></span>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="lb-delete" title="Elimina immagine"><span class="ms">delete</span></button>
+    </div>
+    <button class="icon-btn lb-nav lb-prev" id="lb-prev" title="Precedente"><span class="ms">chevron_left</span></button>
+    <button class="icon-btn lb-nav lb-next" id="lb-next" title="Successiva"><span class="ms">chevron_right</span></button>
   </dialog>
 
   <div class="toast" id="toast" hidden><span id="toast-text"></span><button class="btn text" id="toast-action">Annulla</button></div>
