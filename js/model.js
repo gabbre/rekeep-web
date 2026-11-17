@@ -17,6 +17,8 @@ export function newNote({ checklist = false, label = null } = {}) {
     labels: label ? [label] : [],
     reminder: null,
     images: [],
+    bg: '',
+    links: [],
     createdAt: now,
     updatedAt: now,
     changedAt: now,
@@ -38,6 +40,8 @@ export function fromJson(o) {
     trashedAt: o.trashedAt == null ? null : Number(o.trashedAt),
     labels: [...(o.labels ?? [])],
     reminder: o.reminder ?? null,
+    bg: o.bg ?? '',
+    links: (o.links ?? []).map((l) => ({ u: String(l.u), t: l.t ?? '', s: l.s ?? '', i: l.i ?? '', x: !!l.x })),
     images: (o.images ?? []).map((i) => ({ id: String(i.id), w: Number(i.w ?? 0), h: Number(i.h ?? 0), p: Number(i.p ?? 1) })),
     createdAt: Number(o.createdAt ?? updatedAt),
     updatedAt,
@@ -62,6 +66,8 @@ export function toJson(n) {
   };
   if (n.trashedAt != null) o.trashedAt = n.trashedAt;
   if (n.reminder) o.reminder = n.reminder;
+  if (n.bg) o.bg = n.bg;
+  if (n.links?.length) o.links = n.links.map((l) => ({ u: l.u, t: l.t, s: l.s, i: l.i, x: l.x }));
   if (n.images?.length) o.images = n.images.map((i) => ({ id: i.id, w: i.w, h: i.h, p: i.p }));
   return o;
 }
@@ -87,6 +93,29 @@ export function plainText(n) {
   return n.checklist
     ? n.items.filter((i) => i.t.trim()).map((i) => (i.c ? '☑ ' : '☐ ') + i.t).join('\n')
     : n.text;
+}
+
+const URL_RE = /https?:\/\/[^\s<>"'\][]+/gi;
+
+/** Link presenti nella nota (stessa regola dell'app). */
+export function urlsIn(n) {
+  const text = n.title + '\n' + (n.checklist ? n.items.map((i) => i.t).join('\n') : n.text);
+  const out = [];
+  for (const m of text.matchAll(URL_RE)) {
+    const u = m[0].replace(/[.,;:!?)»"]+$/, '');
+    if (u.length > 10 && !out.includes(u)) out.push(u);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+export const hostOf = (u) => { try { return new URL(u).host.replace(/^www\./, ''); } catch (e) { return u; } };
+
+/** Anteprime da mostrare: quelle create dal telefono, o una scheda semplice per i link nuovi. */
+export function visibleLinks(n) {
+  return urlsIn(n)
+    .map((u) => n.links?.find((l) => l.u === u) ?? { u, t: '', s: hostOf(u), i: '', x: false })
+    .filter((l) => !l.x);
 }
 
 /** Prossima ricorrenza dopo adesso (come l'app). */

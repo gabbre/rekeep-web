@@ -130,9 +130,10 @@ class DemoBackend {
     const h = 3600e3, now = Date.now();
     const notes = [
       { ...newNote(), title: 'Benvenuto in reKeep', text: 'Le note sono cifrate end-to-end.\nSul server arriva solo testo illeggibile.', pinned: true, color: 3 },
-      { ...newNote({ checklist: true }), title: 'Spesa', items: [{ id: newId(), t: 'Latte', c: false }, { id: newId(), t: 'Pane', c: false }, { id: newId(), t: 'Caffè', c: true }], reminder: { type: 'place', lat: 45.6339, lon: 9.2009, radius: 200, place: 'Famila, Nova Milanese', trigger: 'ENTER', repeat: false, done: false }, labels: ['Casa'] },
+      { ...newNote({ checklist: true }), bg: 'spesa', title: 'Spesa', items: [{ id: newId(), t: 'Latte', c: false }, { id: newId(), t: 'Pane', c: false }, { id: newId(), t: 'Caffè', c: true }], reminder: { type: 'place', lat: 45.6339, lon: 9.2009, radius: 200, place: 'Famila, Nova Milanese', trigger: 'ENTER', repeat: false, done: false }, labels: ['Casa'] },
       { ...newNote(), title: 'Chiamare il meccanico', text: 'Tagliando e gomme invernali', reminder: { type: 'time', at: now + 20 * h, repeat: 'NONE', done: false }, color: 6 },
-      { ...newNote(), title: '', text: 'Idea: widget con le note fissate sulla home', labels: ['Idee'], color: 4 },
+      { ...newNote(), title: '', text: 'Idea: widget con le note fissate sulla home', labels: ['Idee'], bg: 'idee' },
+      { ...newNote(), title: 'Regali', text: 'https://it.venchi.com/products/set-degustazione\nhttps://example.com/latta', links: [{ u: 'https://it.venchi.com/products/set-degustazione', t: 'Set Degustazione Cioccolatini Fondenti', s: 'it.venchi.com', i: '', x: false }], bg: 'festa' },
       { ...newNote(), title: 'Palestra', text: 'Spalle con manubri, 3x12', reminder: { type: 'time', at: now + 2 * h, repeat: 'WEEKLY', done: false } },
     ];
     for (const n of notes) this.docs.set(n.id, { c: n.changedAt, d: false, e: await encryptString(key, JSON.stringify(toJson(n))) });

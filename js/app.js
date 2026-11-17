@@ -3,6 +3,7 @@ import { Store } from './store.js';
 import * as M from './model.js';
 import { loadKey, saveKey, forgetKey } from './crypto.js';
 import { openMapPicker } from './mapdialog.js';
+import { BACKGROUNDS, bgById } from './backgrounds.js';
 
 const $ = (id) => document.getElementById(id);
 const darkMq = matchMedia('(prefers-color-scheme: dark)');
@@ -323,10 +324,69 @@ function chip(icon, text, { done = false, onRemove = null, onClick = null } = {}
   return el;
 }
 
+/** Colore o sfondo a tema della nota (lo sfondo prevale sul colore). */
 function applyCardColor(el, n) {
-  const c = M.noteColor(n.color, isDark());
+  const bg = bgById(n.bg);
+  const c = bg ? (isDark() ? bg.dark : bg.light) : M.noteColor(n.color, isDark());
   el.style.setProperty('--card', c ?? 'var(--surface)');
   el.classList.toggle('colored', !!c);
+  el.classList.toggle('themed', !!bg);
+  let art = [...el.children].find((ch) => ch.classList?.contains('bgart'));
+  if (!bg) { art?.remove(); return; }
+  if (!art || art.dataset.bg !== bg.id) {
+    art?.remove();
+    art = document.createElement('div');
+    art.className = 'bgart';
+    art.dataset.bg = bg.id;
+    art.innerHTML = `<svg viewBox="0 0 200 200" aria-hidden="true">${bg.svg}</svg>`;
+    el.prepend(art);
+  }
+}
+
+/** Schede delle anteprime dei link. */
+function linkCards(n, { compact = false, onHide = null } = {}) {
+  const links = M.visibleLinks(n);
+  if (!links.length) return null;
+  const box = document.createElement('div');
+  box.className = compact ? 'links compact' : 'links';
+  for (const l of links.slice(0, compact ? 2 : 5)) {
+    const a = document.createElement('a');
+    a.className = 'link';
+    a.href = l.u;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.onclick = (e) => e.stopPropagation();
+    const th = document.createElement('div');
+    th.className = 'lthumb';
+    th.innerHTML = '<span class="ms">link</span>';
+    if (l.i) {
+      const img = document.createElement('img');
+      img.referrerPolicy = 'no-referrer';
+      img.alt = '';
+      img.onload = () => th.querySelector('.ms')?.remove();
+      img.onerror = () => img.remove();
+      img.src = l.i;
+      th.append(img);
+    }
+    const tx = document.createElement('div');
+    tx.className = 'ltext';
+    const t = document.createElement('b');
+    t.textContent = l.t || l.u.replace(/^https?:\/\/(www\.)?/, '');
+    const s = document.createElement('span');
+    s.textContent = l.s || M.hostOf(l.u);
+    tx.append(t, s);
+    a.append(th, tx);
+    if (onHide) {
+      const x = document.createElement('button');
+      x.className = 'icon-btn small lhide';
+      x.title = 'Rimuovi anteprima';
+      x.innerHTML = '<span class="ms">link_off</span>';
+      x.onclick = (e) => { e.preventDefault(); e.stopPropagation(); onHide(l); };
+      a.append(x);
+    }
+    box.append(a);
+  }
+  return box;
 }
 
 // ---------- Immagini ----------
@@ -493,6 +553,8 @@ function card(n) {
     n.labels.forEach((l) => chips.append(chip(null, l)));
     el.append(chips);
   }
+  const lc = linkCards(n, { compact: true });
+  if (lc) el.append(lc);
 
   if (!M.inTrash(n)) {
     const pin = iconButton('keep', n.pinned ? 'Sblocca' : 'Fissa', () => {
@@ -647,6 +709,21 @@ function refreshEditorChrome() {
   $('ed-toggle-list').title = n.checklist ? 'Trasforma in testo' : 'Trasforma in elenco';
   $('ed-edited').textContent = uploading ? 'Caricamento immagini…' : ed.draft ? '' : M.formatEdited(n.updatedAt);
 
+  const linksBox = $('ed-links');
+  const lkey = JSON.stringify(M.visibleLinks(n)) + trashMode;
+  if (linksBox.dataset.key !== lkey) {
+    linksBox.dataset.key = lkey;
+    linksBox.innerHTML = '';
+    const lc = linkCards(n, {
+      onHide: trashMode ? null : (l) => edit((x) => {
+        const links = (x.links ?? []).filter((y) => y.u !== l.u);
+        links.push({ u: l.u, t: l.t, s: l.s, i: l.i, x: true });
+        return { ...x, links };
+      }),
+    });
+    if (lc) linksBox.append(...lc.childNodes);
+  }
+
   const imgBox = $('ed-images');
   const imgs = n.images ?? [];
   const key = imgs.map((i) => i.id).join(',') + (trashMode ? 't' : '');
@@ -789,21 +866,44 @@ $('ed-color').onclick = () => {
   const pal = $('ed-palette');
   pal.hidden = !pal.hidden;
   if (pal.hidden) return;
+  renderPalette();
+};
+
+function renderPalette() {
+  const pal = $('ed-palette');
   const n = cur();
   pal.innerHTML = '';
+  const row1 = document.createElement('div');
+  row1.className = 'pal-row';
   M.COLOR_NAMES.forEach((name, i) => {
     const s = document.createElement('button');
-    s.className = 'swatch' + (n.color === i ? ' on' : '');
+    s.className = 'swatch' + (!n.bg && n.color === i ? ' on' : '');
     s.title = name;
     s.style.background = M.noteColor(i, isDark()) ?? 'var(--surface)';
     if (i === 0) s.innerHTML = '<span class="ms">format_color_reset</span>';
-    s.onclick = () => {
-      edit((x) => ({ ...x, color: i }), { edited: false });
-      pal.querySelectorAll('.swatch').forEach((el, k) => el.classList.toggle('on', k === i));
-    };
-    pal.append(s);
+    s.onclick = () => { edit((x) => ({ ...x, color: i, bg: '' }), { edited: false }); renderPalette(); };
+    row1.append(s);
   });
-};
+  const row2 = document.createElement('div');
+  row2.className = 'pal-row';
+  const none = document.createElement('button');
+  none.className = 'swatch bgsw' + (!n.bg ? ' on' : '');
+  none.title = 'Nessuno sfondo';
+  none.innerHTML = '<span class="ms">hide_image</span>';
+  none.onclick = () => { edit((x) => ({ ...x, bg: '' }), { edited: false }); renderPalette(); };
+  row2.append(none);
+  for (const b of BACKGROUNDS) {
+    const s = document.createElement('button');
+    s.className = 'swatch bgsw' + (n.bg === b.id ? ' on' : '');
+    s.title = b.name;
+    s.style.background = isDark() ? b.dark : b.light;
+    s.innerHTML = `<svg viewBox="0 0 200 200">${b.svg}</svg>`;
+    s.onclick = () => { edit((x) => ({ ...x, bg: b.id }), { edited: false }); renderPalette(); };
+    row2.append(s);
+  }
+  pal.append(Object.assign(document.createElement('div'), { className: 'pal-title', textContent: 'Colore' }), row1,
+    Object.assign(document.createElement('div'), { className: 'pal-title', textContent: 'Sfondo' }), row2);
+}
 
 $('ed-toggle-list').onclick = () => {
   edit((x) => x.checklist
@@ -863,6 +963,7 @@ $('ed-destroy').onclick = async () => {
 
 $('dlg-editor').addEventListener('close', () => {
   $('ed-images').dataset.key = '';
+  $('ed-links').dataset.key = '';
   const n = store.get(ed.id);
   if (n && M.isBlank(n) && !M.inTrash(n)) store.remove([n.id]);
   ed.id = null;

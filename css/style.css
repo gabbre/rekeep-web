@@ -349,6 +349,43 @@ input[type=range] { width: 100%; accent-color: var(--primary); }
 }
 .toast .btn.text { color: #F7BD48; }
 
+/* ---------- Sfondi a tema ---------- */
+.card.themed { min-height: 120px; }
+.bgart { position: absolute; right: 0; bottom: 0; width: min(72%, 160px); aspect-ratio: 1; pointer-events: none; opacity: .8; z-index: 0; }
+.bgart svg { width: 100%; height: 100%; display: block; }
+.card > :not(.bgart), .editor > :not(.bgart) { position: relative; z-index: 1; }
+.card > .pin { position: absolute; }
+.editor > .bgart { width: min(60%, 300px); position: absolute; }
+.editor > .palette { position: relative; }
+@media (prefers-color-scheme: dark) { .bgart { opacity: .55; } }
+.pal-title { width: 100%; font-weight: 600; font-size: 14px; margin: 4px 2px 2px; }
+.pal-row { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; }
+.swatch.bgsw { width: 46px; height: 46px; overflow: hidden; padding: 0; }
+.swatch.bgsw svg { width: 40px; height: 40px; }
+
+/* ---------- Anteprime link ---------- */
+.links { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 2px; }
+.link {
+  display: flex; align-items: center; height: 76px; border-radius: 14px; overflow: hidden; text-decoration: none; color: inherit;
+  background: color-mix(in srgb, var(--on) 7%, transparent);
+}
+.link:hover { background: color-mix(in srgb, var(--on) 11%, transparent); }
+.lthumb { width: 76px; height: 76px; flex: none; display: grid; place-items: center; color: var(--muted); background: color-mix(in srgb, var(--on) 6%, transparent); }
+.lthumb img { width: 100%; height: 100%; object-fit: cover; grid-area: 1 / 1; }
+.lthumb .ms { grid-area: 1 / 1; }
+.ltext { flex: 1; min-width: 0; padding: 0 14px; display: flex; flex-direction: column; gap: 2px; }
+.ltext b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ltext span { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lhide { margin-right: 6px; opacity: .7; }
+.links.compact { margin: 10px -16px -12px; gap: 0; }
+.links.compact .link { height: 46px; border-radius: 0; border-top: 1px solid color-mix(in srgb, var(--on) 8%, transparent); background: color-mix(in srgb, var(--on) 4%, transparent); }
+.links.compact .lthumb { width: 46px; height: 46px; }
+.links.compact .lthumb .ms { font-size: 18px; }
+.links.compact .ltext { padding: 0 10px; }
+.links.compact .ltext b { font-size: 13px; }
+.links.compact .ltext span { font-size: 11.5px; }
+.card .links.compact + .pin + .acts, .card .links.compact ~ .acts { margin-top: 2px; }
+
 /* ---------- Immagini ---------- */
 .imgs { display: grid; gap: 2px; overflow: hidden; }
 .imgs.n1 { grid-template-columns: 1fr; }
