@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>reKeep</title>
+  <meta name="description" content="Note e promemoria cifrati end-to-end">
+  <meta name="theme-color" content="#FFFBF4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#16130E" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..24,400,0..1,0&display=block" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Caricamento -->
+  <div id="screen-loading" class="screen center">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Accesso -->
+  <div id="screen-login" class="screen center" hidden>
+    <div class="auth-card">
+      <img src="icon.svg" alt="" class="auth-logo">
+      <h1>reKeep</h1>
+      <p class="muted">Note, elenchi e promemoria, sincronizzati con il telefono e cifrati end-to-end.</p>
+      <button class="btn filled wide" id="btn-signin"><span class="ms">login</span>Accedi con Google</button>
+      <p class="tiny muted" id="demo-hint" hidden>Modalità demo: nessun dato reale. La passphrase è <b>demo demo demo</b>.</p>
+      <p class="error" id="login-error" hidden></p>
+    </div>
+  </div>
+
+  <!-- Passphrase -->
+  <div id="screen-pass" class="screen center" hidden>
+    <form class="auth-card" id="pass-form" autocomplete="off">
+      <span class="ms big accent">lock</span>
+      <h1 id="pass-title">Sblocca le note</h1>
+      <p class="muted" id="pass-desc"></p>
+      <div class="warn" id="pass-warn" hidden>
+        <span class="ms">warning</span>
+        <span>Se dimentichi la passphrase, le note sul server non si possono recuperare in nessun modo. Conservala in un gestore di password.</span>
+      </div>
+      <label class="field"><span>Passphrase</span><input type="password" id="pass1" autocomplete="current-password" required></label>
+      <label class="field" id="pass2-wrap" hidden><span>Ripeti la passphrase</span><input type="password" id="pass2" autocomplete="new-password"></label>
+      <label class="check"><input type="checkbox" id="pass-remember" checked> Ricorda su questo dispositivo</label>
+      <p class="error" id="pass-error" hidden></p>
+      <button class="btn filled wide" id="pass-submit" type="submit">Sblocca</button>
+      <button class="btn text" id="pass-signout" type="button">Usa un altro account</button>
+    </form>
+  </div>
+
+  <!-- App -->
+  <div id="screen-app" class="screen" hidden>
+    <header class="topbar">
+      <button class="icon-btn" id="btn-menu" title="Menu"><span class="ms">menu</span></button>
+      <div class="brand"><img src="icon.svg" alt=""><span>reKeep</span></div>
+      <label class="search">
+        <span class="ms">search</span>
+        <input type="search" id="search" placeholder="Cerca" autocomplete="off">
+        <button class="icon-btn small" id="search-clear" title="Cancella" hidden><span class="ms">close</span></button>
+      </label>
+      <div class="top-actions">
+        <span class="sync-state" id="sync-state" title=""><span class="ms">cloud_done</span></span>
+        <button class="icon-btn" id="btn-view" title="Vista elenco"><span class="ms">view_agenda</span></button>
+        <button class="avatar" id="btn-account" title="Account"></button>
+      </div>
+    </header>
+    <div class="layout">
+      <nav class="sidebar" id="sidebar"></nav>
+      <div class="scrim" id="scrim"></div>
+      <main class="main" id="main">
+        <div class="composer" id="composer">
+          <button class="composer-input" id="composer-new">Scrivi una nota…</button>
+          <button class="icon-btn" id="composer-list" title="Nuovo elenco"><span class="ms">check_box</span></button>
+        </div>
+        <div class="trash-info muted" id="trash-info" hidden>
+          Le note nel cestino vengono eliminate dopo 7 giorni.
+          <button class="btn text" id="btn-empty-trash">Svuota cestino</button>
+        </div>
+        <div id="sections"></div>
+        <div class="empty" id="empty" hidden><span class="ms" id="empty-icon">lightbulb</span><p id="empty-text"></p></div>
+      </main>
+    </div>
+    <div class="account-menu" id="account-menu" hidden>
+      <div class="account-head"><div class="avatar big" id="account-avatar"></div><div><b id="account-name"></b><div class="muted tiny" id="account-email"></div></div></div>
+      <div class="muted tiny" id="account-sync"></div>
+      <button class="menu-item" id="btn-lock"><span class="ms">lock</span>Blocca (dimentica la chiave su questo dispositivo)</button>
+      <button class="menu-item" id="btn-signout"><span class="ms">logout</span>Esci</button>
+    </div>
+  </div>
+
+  <!-- Editor nota -->
+  <dialog id="dlg-editor" class="editor">
+    <div class="editor-scroll">
+      <div class="editor-head">
+        <input class="editor-title" id="ed-title" placeholder="Titolo" autocomplete="off">
+        <button class="icon-btn" id="ed-pin" title="Fissa"><span class="ms">keep</span></button>
+      </div>
+      <textarea class="editor-text" id="ed-text" placeholder="Scrivi una nota…" rows="3"></textarea>
+      <div class="checklist" id="ed-list" hidden></div>
+      <div class="chips" id="ed-chips"></div>
+    </div>
+    <div class="editor-foot">
+      <div class="tools" id="ed-tools">
+        <button class="icon-btn" id="ed-reminder" title="Promemoria"><span class="ms">add_alert</span></button>
+        <button class="icon-btn" id="ed-color" title="Colore"><span class="ms">palette</span></button>
+        <button class="icon-btn" id="ed-labels" title="Etichette"><span class="ms">label</span></button>
+        <button class="icon-btn" id="ed-toggle-list" title="Trasforma in elenco"><span class="ms">check_box</span></button>
+        <button class="icon-btn" id="ed-archive" title="Archivia"><span class="ms">archive</span></button>
+        <button class="icon-btn" id="ed-delete" title="Elimina"><span class="ms">delete</span></button>
+        <button class="icon-btn" id="ed-copy" title="Crea una copia"><span class="ms">content_copy</span></button>
+      </div>
+      <div class="tools" id="ed-trash-tools" hidden>
+        <button class="icon-btn" id="ed-restore" title="Ripristina"><span class="ms">restore_from_trash</span></button>
+        <button class="icon-btn" id="ed-destroy" title="Elimina definitivamente"><span class="ms">delete_forever</span></button>
+      </div>
+      <span class="edited muted tiny" id="ed-edited"></span>
+      <button class="btn text" id="ed-close">Chiudi</button>
+    </div>
+    <div class="palette" id="ed-palette" hidden></div>
+  </dialog>
+
+  <!-- Promemoria -->
+  <dialog id="dlg-reminder" class="sheet">
+    <h2>Promemoria</h2>
+    <div class="segmented" role="tablist">
+      <button data-tab="time" class="on"><span class="ms">schedule</span>Data e ora</button>
+      <button data-tab="place"><span class="ms">location_on</span>Luogo</button>
+    </div>
+    <div id="rem-time">
+      <div class="quick" id="rem-quick"></div>
+      <div class="row2">
+        <label class="field"><span>Data e ora</span><input type="datetime-local" id="rem-at"></label>
+        <label class="field"><span>Ripeti</span>
+          <select id="rem-repeat">
+            <option value="NONE">Una volta</option><option value="DAILY">Ogni giorno</option>
+            <option value="WEEKLY">Ogni settimana</option><option value="MONTHLY">Ogni mese</option><option value="YEARLY">Ogni anno</option>
+          </select>
+        </label>
+      </div>
+      <p class="error" id="rem-past" hidden>Scegli un momento nel futuro</p>
+      <button class="btn filled wide" id="rem-set">Imposta promemoria</button>
+    </div>
+    <div id="rem-place" hidden>
+      <div class="segmented small">
+        <button data-trigger="ENTER" class="on">Quando arrivo</button>
+        <button data-trigger="EXIT">Quando esco</button>
+      </div>
+      <div class="current-place" id="rem-current" hidden></div>
+      <div id="rem-places"></div>
+      <button class="list-item" id="rem-map"><span class="ms">map</span><span><b>Scegli sulla mappa</b><br><span class="muted tiny">Cerca un indirizzo o sposta la mappa sotto il segnaposto</span></span></button>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn text danger" id="rem-remove" hidden><span class="ms">delete</span>Rimuovi promemoria</button>
+      <span class="spacer"></span>
+      <button class="btn text" data-close>Annulla</button>
+    </div>
+    <p class="tiny muted">Gli avvisi arrivano sul telefono con l'app reKeep.</p>
+  </dialog>
+
+  <!-- Mappa -->
+  <dialog id="dlg-map" class="mapdlg">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-circle" id="map-circle"></div>
+      <div class="map-pin" id="map-pin"><span class="ms filled">location_on</span></div>
+      <div class="map-search">
+        <button class="icon-btn" data-close title="Indietro"><span class="ms">arrow_back</span></button>
+        <input id="map-q" placeholder="Cerca un indirizzo o un luogo" autocomplete="off">
+        <button class="icon-btn" id="map-go" title="Cerca"><span class="ms">search</span></button>
+      </div>
+      <div class="map-results" id="map-results" hidden></div>
+      <button class="fab-small" id="map-me" title="La mia posizione"><span class="ms">my_location</span></button>
+      <div class="map-attrib">© OpenFreeMap · © OpenStreetMap</div>
+    </div>
+    <div class="map-panel">
+      <div class="place-line"><span class="ms accent">location_on</span><div><b id="map-addr">Punto sulla mappa</b><div class="muted tiny" id="map-coords"></div></div></div>
+      <div class="radius-head"><span>Raggio</span><b id="map-radius-label">200 m</b></div>
+      <div class="chips-row" id="map-radius-chips"></div>
+      <input type="range" id="map-radius" min="100" max="2000" step="50" value="200">
+      <div class="segmented small" id="map-trigger">
+        <button data-trigger="ENTER" class="on">Quando arrivo</button>
+        <button data-trigger="EXIT">Quando esco</button>
+      </div>
+      <label class="check"><input type="checkbox" id="map-repeat"> Ripeti ogni volta</label>
+      <label class="check"><input type="checkbox" id="map-save"> Salva tra i luoghi (es. Casa, Lavoro)</label>
+      <label class="field" id="map-save-name-wrap" hidden><span>Nome del luogo</span><input id="map-save-name"></label>
+      <button class="btn filled wide" id="map-confirm">Conferma luogo</button>
+    </div>
+  </dialog>
+
+  <!-- Etichette della nota -->
+  <dialog id="dlg-labels" class="sheet small">
+    <h2>Etichette</h2>
+    <div class="field-row"><input id="lab-new" placeholder="Nuova etichetta"><button class="icon-btn" id="lab-add" title="Crea"><span class="ms">add</span></button></div>
+    <div id="lab-list" class="check-list"></div>
+    <div class="sheet-foot"><span class="spacer"></span><button class="btn text" data-close>Fine</button></div>
+  </dialog>
+
+  <!-- Modifica etichette -->
+  <dialog id="dlg-edit-labels" class="sheet small">
+    <h2>Modifica etichette</h2>
+    <div class="field-row"><input id="el-new" placeholder="Crea nuova etichetta"><button class="icon-btn" id="el-add" title="Crea"><span class="ms">add</span></button></div>
+    <div id="el-list"></div>
+    <div class="sheet-foot"><span class="spacer"></span><button class="btn text" data-close>Fine</button></div>
+  </dialog>
+
+  <!-- Conferma -->
+  <dialog id="dlg-confirm" class="sheet small">
+    <h2 id="cf-title"></h2>
+    <p id="cf-text" class="muted"></p>
+    <div class="sheet-foot"><span class="spacer"></span><button class="btn text" data-close>Annulla</button><button class="btn filled" id="cf-ok">Elimina</button></div>
+  </dialog>
+
+  <div class="toast" id="toast" hidden><span id="toast-text"></span><button class="btn text" id="toast-action">Annulla</button></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
